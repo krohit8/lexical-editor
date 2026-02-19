@@ -1,7 +1,7 @@
 import type { Post } from '../store/useStore';
+import { API_URL } from '../config';
 
 const STORAGE_KEY = 'lexical-document-editor';
-const API_URL = 'http://localhost:8000/api';
 
 export async function loadContent(docId?: string): Promise<string | null> {
   if (docId) {

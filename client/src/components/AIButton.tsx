@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import { $getRoot } from 'lexical';
+import { API_URL } from '../config';
 
 export default function AIButton() {
   const [editor] = useLexicalComposerContext();
@@ -14,7 +15,7 @@ export default function AIButton() {
       return $getRoot().getTextContent();
     });
 
-    const res = await fetch('http://localhost:8000/api/ai/generate', {
+    const res = await fetch(`${API_URL}/ai/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, action: 'summary' })
@@ -44,7 +45,7 @@ export default function AIButton() {
       <button
         onClick={generateSummary}
         disabled={loading}
-        className="px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 disabled:opacity-50 text-sm font-medium transition-colors"
+        className="px-4 py-2 bg-pink-900 text-white rounded hover:bg-pink-500 disabled:opacity-50 text-sm font-medium transition-colors"
       >
         {loading ? 'Generating...' : 'Generate Summary'}
       </button>

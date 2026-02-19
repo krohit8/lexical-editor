@@ -1,6 +1,5 @@
 import type { Post } from '../store/useStore';
-
-const API_URL = 'http://localhost:8000/api';
+import { API_URL } from '../config';
 
 export const createPost = async (title: string = 'Untitled'): Promise<Post> => {
   const res = await fetch(`${API_URL}/posts`, {

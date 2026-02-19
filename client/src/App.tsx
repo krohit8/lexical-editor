@@ -4,21 +4,33 @@ import Sidebar from './components/Sidebar';
 import useStore from './store/useStore';
 import { useUIStore } from './store/useUIStore';
 import useDebounce from './hooks/useDebounce';
-import { createPost, updatePost, publishPost } from './api/posts';
+import { createPost, updatePost, publishPost, getPosts } from './api/posts';
 import type { EditorState } from 'lexical';
 
+let initPromise: Promise<void> | null = null;
+
 export default function App() {
-  const { activePost, setActivePost } = useStore();
+  const { posts, activePost, setPosts, setActivePost } = useStore();
   const { isSaving, setSaving } = useUIStore();
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
 
   useEffect(() => {
-    if (!activePost) {
-      createPost().then(post => setActivePost(post));
+    if (!initPromise) {
+      initPromise = getPosts().then((fetched) => {
+        setPosts(fetched);
+        if (fetched.length > 0) {
+          setActivePost(fetched[0]);
+        } else {
+          return createPost().then((post) => {
+            setActivePost(post);
+            setPosts([post]);
+          });
+        }
+      }).then(() => {});
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
-  }, []); 
+    initPromise.then(() => {});
+  }, [setPosts, setActivePost]);
 
   useEffect(() => {
     if (activePost) setTitleValue(activePost.title);
@@ -44,8 +56,9 @@ export default function App() {
   const handlePublish = async () => {
     if (!activePost) return;
     try {
-      await publishPost(activePost.id);
-      setActivePost({ ...activePost, status: 'published' });
+      const updated = await publishPost(activePost.id);
+      setActivePost(updated);
+      setPosts(posts.map((p) => (p.id === updated.id ? updated : p)));
     } catch (err) {
       console.error('Failed to publish post', err);
     }
