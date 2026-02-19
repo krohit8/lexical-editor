@@ -4,7 +4,7 @@ class Post:
     @staticmethod
     def create(db,title="untitled"):
         post_id = str(uuid4())
-        db.execute("INSERT INTO posts (id,title) VALUES (?,?)",post_id,title)
+        db.execute("INSERT INTO posts (id,title,content_json) VALUES (?,?,?)",(post_id,title,None))
         db.commit()
         return post_id
 
@@ -14,13 +14,13 @@ class Post:
         return [dict(row) for row in cursor.fetchall()]
 
     @staticmethod
-    def get_by_id(db,post_id):
-        cursor = db.execute("SELECT * FROM posts WHERE id = ?",(post_id))
+    def get_by_id(db, post_id):
+        cursor = db.execute("SELECT * FROM posts WHERE id = ?", (post_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
 
     @staticmethod
-    def update(db,post_id,title=None, content_json=None):
+    def update(db, post_id, title=None, content_json=None):
         updates = []
         params = []
         if title is not None:
@@ -29,10 +29,11 @@ class Post:
         if content_json is not None:
             updates.append("content_json = ?")
             params.append(content_json)
+        
         if updates:
             updates.append("updated_at = CURRENT_TIMESTAMP")
-            params.append(post_id)
-            db.execute(f"UPDATE posts SET {', '.join(updates)} WHERE id = ?",params)
+            params.append(post_id) 
+            db.execute(f"UPDATE posts SET {', '.join(updates)} WHERE id = ?", tuple(params))
             db.commit()
     
     @staticmethod

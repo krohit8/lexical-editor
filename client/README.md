@@ -1,73 +1,102 @@
-# React + TypeScript + Vite
+# Document Editor (Lexical)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A React-based document editor using Lexical with support for structured content: tables, mathematical expressions (LaTeX/KaTeX), and persistence.
 
-Currently, two official plugins are available:
+## Design Decisions
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. Lexical Architecture
 
-## React Compiler
+**Editor instances & state**
+- One `LexicalComposer` per document. Each editor instance owns its own `EditorState`.
+- State flows: `EditorState` → `onChange` → serialized JSON → persistence layer.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+**Plugins**
+- `TablePlugin` (`@lexical/react`) – handles table commands, selection, and keyboard nav.
+- `InsertMathPlugin` – custom plugin registering `INSERT_MATH_BLOCK_COMMAND` and `INSERT_MATH_INLINE_COMMAND`.
+- `OnChangePlugin` – debounced persistence on content change.
+- `HistoryPlugin` – undo/redo.
 
-## Expanding the ESLint configuration
+**Avoiding direct DOM**
+- Custom nodes (e.g. `MathNode`) extend `DecoratorBlockNode` and use `decorate()` to return React components. KaTeX output is rendered via React, not manual DOM.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 2. Table Support
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- Uses `@lexical/table` (TableNode, TableRowNode, TableCellNode).
+- Table logic is in `src/lexical/utils/tableUtils.ts`:
+  - `insertTable(editor, rows, cols)` – dispatch `INSERT_TABLE_COMMAND`.
+  - `insertTableRow` / `deleteTableRow` – use `$insertTableRowAtSelection` and `$deleteTableRowAtSelection`.
+- Toolbar calls these utilities; no table logic inside UI components.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+### 3. Mathematical Expressions
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- `MathNode` extends `DecoratorBlockNode` and renders via KaTeX.
+- Block vs inline controlled by `__isInline`.
+- Editable: clicking the rendered math opens an input; "Insert" writes back via `editor.update()` and `node.setLatex()`.
+- LaTeX is stored in the node and serialized/restored with the document.
+
+### 4. State Management (Zustand)
+
+Two stores:
+
+- **`useStore`** – posts, active post, API-facing content metadata.
+- **`useUIStore`** – UI-only:
+  - `isSaving`, `isLoading`, `mathModalOpen`
+  - Keeps UI state out of editor/domain logic and avoids re-renders from content changes.
+
+Editor content lives in Lexical `EditorState`; Zustand only tracks UI and app-level metadata.
+
+### 5. Persistence
+
+- Content saved as serialized JSON (`editorState.toJSON()`).
+- `api/persistence.ts` supports:
+  - REST API (`/api/posts/:id`) when backend is available.
+  - `localStorage` fallback by document ID.
+- Structure is API-ready: `loadContent(docId)` and `saveContent(json, docId)`.
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── DocumentEditor/
+│   │   ├── Editor.tsx       # Lexical setup, plugins, nodes
+│   │   └── Toolbar.tsx      # Format + table + math actions
+│   ├── AIButton.tsx
+│   └── Sidebar.tsx
+├── lexical/
+│   ├── nodes/
+│   │   └── MathNode.tsx     # KaTeX DecoratorBlockNode
+│   ├── plugins/
+│   │   └── InsertMathPlugin.tsx
+│   ├── theme.ts
+│   └── utils/
+│       └── tableUtils.ts
+├── store/
+│   ├── useStore.ts          # Posts, active post
+│   ├── useEditorStore.ts    # (optional) editor content cache
+│   └── useUIStore.ts        # UI state
+├── api/
+│   ├── posts.ts             # Post CRUD
+│   └── persistence.ts      # Load/save abstraction
+└── hooks/
+    └── useDebounce.ts
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Usage
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cd client && npm install && npm run dev
 ```
+
+Start the backend for API persistence:
+
+```bash
+cd server && uvicorn app.main:app --reload
+```
+
+## Features
+
+- Rich text: bold, italic, underline, headings, lists
+- Tables: insert 3×3, edit cells, tab navigation
+- Math: block and inline LaTeX via KaTeX, editable
+- Persistence: JSON serialization with API and localStorage

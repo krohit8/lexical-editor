@@ -11,9 +11,9 @@ def init_db():
         CREATE TABLE IF NOT EXISTS posts (
             id TEXT PRIMARY KEY,
             title TEXT DEFAULT "untitled",
-            content_json TEXT DEFAULT "{}",
+            content_json TEXT,
             status TEXT DEFAULT "draft",
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,))
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
